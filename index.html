@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Квартиры</title>
+    <style>
+html, body {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;   /* ← Это запрещает горизонтальный скролл */
+    overflow-y: auto;     /* ← Это разрешает вертикальный скролл */
+}
+        body {
+    background: #F7F7F7;
+    min-height: 100vh;
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+.top-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 540px;
+    margin: 18px auto 12px auto;
+    padding: 0 4vw;
+}
+.top-found {
+    color: #444;
+    font-size: 1em;
+    white-space: nowrap;
+}
+.top-found b {
+    font-size: 1.13em;
+    font-weight: 700;
+    color: #080808;
+}
+.sort-wrap {
+    flex: 1;
+    min-width: 0;
+}
+.sort-select {
+    width: 100%;
+    padding: 8px 35px 8px 13px;
+    font-size: 1em;
+    border-radius: 11px;
+    border: 1px solid #E2E2E2;
+    background: #fff url('data:image/svg+xml;utf8,<svg width="12" height="8" viewBox="0 0 12 8" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1.5L6 6.5L11 1.5" stroke="%23999" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>') right 12px center/14px no-repeat;
+    appearance: none;
+    outline: none;
+    cursor: pointer;
+}
+.filter-btn {
+    width: 40px; height: 40px;
+    background: #191919;
+    border-radius: 13px;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+.filter-btn svg {
+    width: 22px; height: 22px; fill: #fff;
+}
+
+.cards-col {
+    max-width: 540px;
+    width: 100%;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    box-sizing: border-box;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+@media (max-width: 600px) {
+    .cards-col {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+}
+
+.estate-card {
+    width: 100%;
+    background: #fff;
+    border-radius: 21px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.07);
+    padding: 18px 18px 15px 18px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+}
+.title {
+    font-size: 1.12em;
+    font-weight: 600;
+    margin-bottom: 0.1em;
+}
+.subtitle {
+    font-size: 0.98em;
+    color: #A7A7A7;
+    margin-bottom: 8px;
+}
+.gallery-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+.gallery-main {
+    flex: 1 1 0;
+    background: #F7F7F7;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    min-height: 72px;
+    aspect-ratio: 1/1;
+    overflow: hidden;
+}
+.gallery-main img {
+    max-width: 97%;
+    max-height: 97%;
+    border-radius: 6px;
+}
+.gallery-thumbs {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    align-items: flex-start;
+    overflow-x: auto;
+    max-width: 75px;
+}
+.gallery-thumbs img {
+    width: 33px;
+    height: 24px;
+    object-fit: cover;
+    background: #fff;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border 0.15s;
+}
+.gallery-thumbs img.active {
+    border: 2px solid #2B7CFF;
+}
+.price-row {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 7px;
+    margin-bottom: 2px;
+}
+.price {
+    font-size: 1.11em;
+    font-weight: 700;
+    color: #232323;
+    margin-right: auto;
+}
+.tag {
+    background: #232323;
+    color: #fff;
+    border-radius: 12px;
+    padding: 2px 9px;
+    font-size: 0.97em;
+    font-weight: 500;
+    margin-left: 2px;
+    white-space: nowrap;
+}
+/* ---- Модалка карточки ---- */
+.modal-bg {
+    position: fixed;
+    z-index: 1001;
+    top: 0; left: 0; right: 0; bottom: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.17);
+    display: none;
+    justify-content: center;
+    align-items: flex-end;
+    overflow-y: auto;
+}
+.modal-card,
+.filter-drawer,
+.form-popup {
+    max-width: 100vw;
+    width: 100%;
+    box-sizing: border-box;
+}
+.modal-bg.open { display: flex; }
+.modal-card {
+    background: #fff;
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+    width: 100vw;
+    max-width: 540px;
+    margin: 0;
+    padding: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh;
+    max-height: 98vh;
+}
+.modal-content {
+    padding: 24px 14px 100px 14px;
+    overflow-y: auto;
+}
+.modal-close {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: none;
+    border: none;
+    font-size: 2.1em;
+    color: #bbb;
+    cursor: pointer;
+    z-index: 4;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+.modal-close:hover {
+    color: #232323;
+}
+.modal-head-title {
+    font-size: 1.3em;
+    font-weight: 700;
+    margin-bottom: 12px;
+    line-height: 1.13;
+    display: block;
+}
+
+.modal-caps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    margin-bottom: 14px;
+}
+.modal-cap {
+    display: inline-block;
+    background: #F4F4F4;
+    color: #222;
+    border-radius: 13px;
+    font-size: 0.96em;
+    padding: 6px 16px;
+    font-weight: 500;
+}
+
+
+.modal-gallery-row {
+    display: flex;
+    gap: 12px; /* чуть больше, чтобы не прилипало */
+    align-items: flex-start;
+    margin-bottom: 13px;
+    /* не задаём явную высоту! */
+}
+
+.modal-gallery-main {
+    width: 100%;
+    max-width: 370px; /* или сколько надо, чтобы на мобильном было ок */
+    aspect-ratio: 1/1;
+    border-radius: 8px;
+    background: #F7F7F7;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    /* задаём фиксированную высоту для синхронизации с thumbs */
+    height: 320px;  /* например, 320px — подбери под свой дизайн! */
+    min-width: 0;
+}
+
+.modal-gallery-main img {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 7px;
+}
+
+.modal-gallery-thumbs {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    justify-content: flex-start;
+    /* вот тут ключевое: */
+    max-height: 320px;   /* ТОЧНО такое же, как .modal-gallery-main height! */
+    overflow-y: auto;
+    min-width: 50px;     /* чтобы не прыгал layout */
+    max-width: 80px;
+    padding-right: 1px;  /* чтобы не прилипал скроллбар */
+}
+
+.modal-gallery-thumbs img {
+    width: 38px;
+    height: 28px;
+    object-fit: cover;
+    background: #fff;
+    border-radius: 5px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: border 0.13s;
+}
+.modal-gallery-thumbs img.active {
+    border: 2px solid #2B7CFF;
+}
+.modal-price-row {
+    display: flex;
+    align-items: flex-end;
+    gap: 13px;
+    margin-bottom: 11px;
+}
+.modal-price {
+    font-size: 1.19em;
+    font-weight: 700;
+    color: #232323;
+}
+.modal-watch {
+    margin-left: auto;
+    color: #666;
+    font-size: 1em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.modal-section-title {
+    font-size: 1em;
+    font-weight: 700;
+    margin-top: 15px;
+    margin-bottom: 6px;
+}
+.modal-features-list {
+    margin: 0 0 7px 0;
+    font-size: 0.98em;
+}
+.modal-features-list span {
+    display: block;
+    color: #888;
+    margin-bottom: 2px;
+}
+.modal-features-list .key {
+    color: #888;
+    min-width: 100px;
+    display: inline-block;
+}
+.modal-features-list .value {
+    color: #171717;
+    font-weight: 500;
+}
+.modal-showmore {
+    color: #ff5500;
+    font-size: 1em;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.modal-options-list {
+    margin: 0 0 7px 0;
+    font-size: 0.95em;
+}
+.modal-options-list span {
+    color: #28b036;
+    margin-right: 7px;
+}
+.modal-description {
+    margin: 0 0 10px 0;
+    font-size: 1em;
+    white-space: pre-line;
+}
+.sticky-btn-wrap {
+    position: fixed;
+    z-index: 1100;
+    left: 0; right: 0; bottom: 0;
+    width: 100vw;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    background: transparent;
+    pointer-events: none;
+    padding-right: 4vw;
+}
+.sticky-btn {
+    pointer-events: auto;
+    margin: 0 0 19px 0;
+    padding: 0 22px;
+    border: none;
+    height: 49px;
+    background: #232323;
+    color: #fff;
+    font-size: 1.09em;
+    font-weight: 500;
+    border-radius: 11px;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+/* --- Фильтр --- */
+.filter-drawer-bg {
+    position: fixed;
+    z-index: 1300;
+    left: 0; top: 0; right: 0; bottom: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.13);
+    display: none;
+    align-items: flex-end;
+    justify-content: flex-end;
+    transition: background .18s;
+}
+.filter-drawer-bg.open { display: flex; }
+.filter-drawer {
+    background: #fff;
+    width: 100vw;
+    max-width: 540px;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 0 24px rgba(0,0,0,0.11);
+    padding: 0 0 18px 0;
+    min-height: 320px;
+    position: relative;
+    animation: filterSlideIn .24s cubic-bezier(.36,1.23,.57,1.03);
+}
+@keyframes filterSlideIn {
+    from { transform: translateY(100%);}
+    to   { transform: translateY(0);}
+}
+.filter-drawer .filter-bar {
+    width: 60px;
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    margin: 12px auto 10px auto;
+}
+.filter-drawer .filter-title {
+    text-align: left;
+    font-size: 1.08em;
+    font-weight: 700;
+    margin: 0 0 2px 24px;
+    margin-top: 8px;
+}
+.filter-drawer .filter-found {
+    margin: 0 0 18px 24px;
+    color: #444;
+    font-size: 0.98em;
+}
+.filter-section {
+    margin: 0 24px 18px 24px;
+}
+.filter-section label {
+    font-size: 1em;
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+}
+.filter-section select, .filter-section input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    font-size: 1.05em;
+    box-sizing: border-box;
+    margin-bottom: 8px;
+    background: #fafafa;
+}
+.filter-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    margin: 13px 24px 0 24px;
+}
+.filter-reset {
+    background: #F31D1D;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1.01em;
+    padding: 11px 0;
+    cursor: pointer;
+}
+.filter-apply {
+    background: #232323;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 1.01em;
+    padding: 11px 0;
+    cursor: pointer;
+}
+/* ---- Форма заявки ---- */
+.form-overlay { position: fixed; z-index: 1200; left: 0; top: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.16); display: none; align-items: center; justify-content: center;}
+.form-overlay.open { display: flex; }
+.form-popup {
+    background: #fff;
+    border-radius: 16px;
+    padding: 22px 7vw 22px 7vw;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.16);
+    max-width: 400px;
+    width: 96vw;
+    box-sizing: border-box;
+    position: relative;
+}
+.form-popup h2 {
+    text-align: center;
+    font-size: 1.13em;
+    font-weight: 700;
+    margin: 0 0 13px 0;
+}
+.form-popup label {
+    font-size: 1em;
+    font-weight: 500;
+    margin-bottom: 5px;
+    display: block;
+}
+.form-popup input[type="text"], .form-popup input[type="tel"] {
+    width: 100%;
+    padding: 7px 10px;
+    margin-bottom: 11px;
+    border-radius: 7px;
+    border: 1px solid #ccc;
+    font-size: 1.05em;
+    box-sizing: border-box;
+    background: #fafafa;
+}
+.form-popup button {
+    width: 100%;
+    padding: 10px 0;
+    border: none;
+    border-radius: 10px;
+    background: #232323;
+    color: #fff;
+    font-size: 1.07em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 2px;
+}
+.form-popup button[disabled] {
+    background: #bbb;
+    cursor: default;
+}
+.form-popup .form-close-btn {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    background: none;
+    border: none;
+    font-size: 2em;
+    color: #bbb;
+    cursor: pointer;
+    z-index: 4;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s;
+}
+.form-popup .form-close-btn:hover {
+    color: #232323;
+}
+.form-popup .form-success {
+    color: #28b036;
+    text-align: center;
+    font-weight: 600;
+    margin: 13px 0 0 0;
+    font-size: 1.08em;
+}
+@media (max-width:375px) {
+    .modal-card, .filter-drawer {max-width:100vw;}
+    .cards-col, .top-bar { padding-left: 2vw; padding-right: 2vw; }
+    .top-bar {padding:0 2vw;}
+}
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <span class="top-found">Найдено:<br><b id="foundCount">0 квартир</b></span>
+        <div class="sort-wrap">
+            <select class="sort-select" id="sortSelect">
+                <option value="none">Сортировать</option>
+                <option value="price-asc">По цене ↑</option>
+                <option value="price-desc">По цене ↓</option>
+            </select>
+        </div>
+        <button class="filter-btn" id="filterBtn" title="Фильтр">
+           <svg viewBox="0 0 24 24" width="24" height="24" fill="none">
+  <path d="M4 4h16M6 8h12M8 12h8M10 16h4M12 20h0" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+</svg>
+        </button>
+    </div>
+    <div class="cards-col" id="cardsCol"></div>
+    <div id="noData" style="color:#888; text-align:center; font-size:1.13em;">Нет сохранённых объектов</div>
+    <!-- МОДАЛКА -->
+    <div class="modal-bg" id="modalBg">
+        <div class="modal-card" id="modalCard">
+            <button class="modal-close" id="modalClose" aria-label="Закрыть">&times;</button>
+            <div class="modal-content" id="modalContent"></div>
+        </div>
+        <div class="sticky-btn-wrap">
+            <button class="sticky-btn" id="modalOrderBtn">Оставить заявку</button>
+        </div>
+    </div>
+    <!-- Фильтр -->
+    <div class="filter-drawer-bg" id="filterDrawerBg">
+        <div class="filter-drawer">
+            <div class="filter-bar"></div>
+            <div class="filter-title">Фильтры</div>
+            <div class="filter-found" id="filterFound"></div>
+            <div class="filter-section">
+                <label for="villageFilter">Посёлок</label>
+                <select id="villageFilter">
+                    <option value="">Все</option>
+                </select>
+            </div>
+            <div class="filter-btns">
+                <button class="filter-reset" id="filterReset">Сбросить фильтры</button>
+                <button class="filter-apply" id="filterApply">Применить</button>
+            </div>
+        </div>
+    </div>
+    <!-- Форма заявки -->
+    <div class="form-overlay" id="formOverlay">
+        <div class="form-popup">
+            <button class="form-close-btn" id="formCloseBtn" aria-label="Закрыть">&times;</button>
+            <h2>Оставить заявку</h2>
+            <form id="orderForm" autocomplete="off">
+                <label for="orderName">Ваше имя</label>
+                <input type="text" id="orderName" name="orderName" required>
+                <label for="orderPhone">Телефон</label>
+                <input type="tel" id="orderPhone" name="orderPhone" required pattern="^[\d\s\+\-\(\)]+$" placeholder="+7 999 123-45-67">
+                <button type="submit" id="orderSubmitBtn">Отправить</button>
+                <div class="form-success" id="orderSuccess" style="display:none;">Заявка отправлена!</div>
+            </form>
+        </div>
+    </div>
+    <script>
+        // ======= НАСТРОЙКИ TELEGRAM =======
+const TELEGRAM_BOT_TOKEN = '7686721947:AAHKUg9yYTsIFAHZzOXYx1rZnYKLvI8IAaE';
+const TELEGRAM_CHAT_ID = '346461657';
+// ===================================
+
+let allCards = [];
+let filteredCards = [];
+fetch('/api/list').then(r => r.json()).then(cards => {
+    allCards = cards;
+    filteredCards = [...allCards];
+    renderCards();
+});
+
+// --- Фильтры ---
+const filterBtn = document.getElementById('filterBtn');
+const filterDrawerBg = document.getElementById('filterDrawerBg');
+const filterFound = document.getElementById('filterFound');
+const villageFilter = document.getElementById('villageFilter');
+const filterReset = document.getElementById('filterReset');
+const filterApply = document.getElementById('filterApply');
+
+function fillVillageOptions() {
+    const villages = [...new Set(allCards.map(c => c.village).filter(Boolean))];
+    villageFilter.innerHTML = '<option value="">Все</option>' + villages.map(v => `<option>${v}</option>`).join('');
+}
+fillVillageOptions();
+
+function applyFilters() {
+    filteredCards = allCards.filter(card => {
+        if (villageFilter.value && card.village !== villageFilter.value) return false;
+        return true;
+    });
+    if (currentSort === 'price-asc') filteredCards.sort((a, b) => (+a.price || 0) - (+b.price || 0));
+    if (currentSort === 'price-desc') filteredCards.sort((a, b) => (+b.price || 0) - (+a.price || 0));
+    renderCards();
+    filterDrawerBg.classList.remove('open');
+}
+filterBtn.onclick = () => {
+    fillVillageOptions();
+    filterDrawerBg.classList.add('open');
+    filterFound.textContent = 'Найдено: ' + filteredCards.length + ' квартир';
+};
+filterApply.onclick = () => applyFilters();
+filterReset.onclick = () => {
+    villageFilter.value = '';
+    applyFilters();
+};
+filterDrawerBg.onclick = e => { if (e.target === filterDrawerBg) filterDrawerBg.classList.remove('open'); };
+
+// --- Сортировка ---
+let currentSort = 'none';
+const sortSelect = document.getElementById('sortSelect');
+sortSelect.onchange = function () {
+    currentSort = this.value;
+    applyFilters();
+};
+
+// --- Рендер карточек ---
+const cardsCol = document.getElementById('cardsCol');
+const foundCount = document.getElementById('foundCount');
+const noData = document.getElementById('noData');
+function renderCards() {
+    cardsCol.innerHTML = '';
+    foundCount.textContent = filteredCards.length + ' квартир';
+    noData.style.display = filteredCards.length ? 'none' : '';
+    filteredCards.forEach((estate, idx) => {
+        const card = document.createElement('div');
+        card.className = 'estate-card';
+
+        // Название: поселок, площадь
+        let title = '';
+        if (estate.village) title += estate.village + ', ';
+        if (estate.area_house) title += estate.area_house + 'м²';
+        else title += 'Объект';
+
+        // Подзаголовок: адрес
+        let subtitle = '';
+        if (estate.address) subtitle = 'Адрес: ' + estate.address;
+
+        // Цена
+        let price = '';
+        if (estate.price) price = estate.price.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + ' ₽';
+
+        // Тэги
+        let tagArea = estate.area_house ? estate.area_house + ' м²' : '';
+        let tagLand = estate.area_land ? 'Участок ' + estate.area_land + ' м²' : '';
+
+        card.innerHTML = `
+            <div class="title">${title}</div>
+            <div class="subtitle">${subtitle}</div>
+            <div class="gallery-row">
+                <div class="gallery-main" id="galleryMain${idx}"></div>
+                <div class="gallery-thumbs" id="galleryThumbs${idx}"></div>
+            </div>
+            <div class="price-row">
+                <div class="price">${price}</div>
+                <div class="tag">${tagArea}</div>
+                <div class="tag">${tagLand}</div>
+            </div>
+        `;
+        cardsCol.appendChild(card);
+
+        // Галерея
+        let current = 0;
+        const galleryMain = document.getElementById('galleryMain' + idx);
+        const galleryThumbs = document.getElementById('galleryThumbs' + idx);
+        function renderGallery() {
+            galleryMain.innerHTML = `<img src="${estate.images[current]}" alt="Фото объекта">`;
+            galleryThumbs.innerHTML = '';
+            estate.images.forEach((img, j) => {
+                const thumb = document.createElement('img');
+                thumb.src = img;
+                thumb.className = j === current ? 'active' : '';
+                thumb.onclick = (event) => {
+                    event.stopPropagation();
+                    current = j;
+                    renderGallery();
+                };
+                galleryThumbs.appendChild(thumb);
+            });
+        }
+        renderGallery();
+
+        card.addEventListener('click', () => {
+            modalEstateRef = estate;
+            openModal(estate);
+        });
+    });
+}
+renderCards();
+
+// ---- МОДАЛКА ----
+const modalBg = document.getElementById('modalBg');
+const modalClose = document.getElementById('modalClose');
+const modalContent = document.getElementById('modalContent');
+const modalOrderBtn = document.getElementById('modalOrderBtn');
+let watchers = getWatchers();
+let modalEstateRef = null;
+
+function getWatchers() {
+    return Math.floor(Math.random() * 36) + 2;
+}
+
+function openModal(estate) {
+    watchers = getWatchers();
+    modalBg.classList.add('open');
+    document.body.style.overflow = 'hidden';
+
+    let title = '';
+    if (estate.village) title += estate.village + ', ';
+    if (estate.area_house) title += estate.area_house + 'м²';
+    else title += 'Объект';
+
+    let caps = '';
+    if (estate.status) caps += `<span class="modal-cap">${estate.status}</span>`;
+    if (estate.floor) caps += `<span class="modal-cap">Этаж: ${estate.floor}</span>`;
+    else if (estate.area_land) caps += `<span class="modal-cap">Участок: ${estate.area_land} м²</span>`;
+    if (estate.material) caps += `<span class="modal-cap">Дом: ${estate.material}</span>`;
+
+    let galMain = `<div class="modal-gallery-main" id="modalGalleryMain"></div>`;
+    let galThumbs = `<div class="modal-gallery-thumbs" id="modalGalleryThumbs"></div>`;
+
+    let price = '';
+    if (estate.price) price = estate.price.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + ' ₽';
+
+    let dateLine = (estate.date && estate.date !== '—') ?
+        `<span><span class="key">Дата сдачи:</span> <span class="value">${estate.date}</span></span>` : '';
+
+    modalContent.innerHTML = `
+        <div class="modal-head-title">${title}</div>
+        <div class="modal-head-sub"></div>
+        <div class="modal-caps">${caps}</div>
+        <div class="modal-gallery-row">
+            ${galMain}
+            ${galThumbs}
+        </div>
+        <div class="modal-price-row">
+            <div class="modal-price">${price}</div>
+        </div>
+        <div class="modal-section-title">Характеристики</div>
+        <div class="modal-features-list" id="modalFeaturesList">
+            ${dateLine}
+            <span><span class="key">Продавец:</span> <span class="value">${estate.seller ? estate.seller : 'Застройщик'}</span></span>
+            <span><span class="key">Тип жилья:</span> <span class="value">${estate.status || '—'}</span></span>
+            <span><span class="key">Кол-во комнат:</span> <span class="value">${estate.rooms ? estate.rooms : 'Студия'}</span></span>
+            <span><span class="key">Площадь:</span> <span class="value">${estate.area_house || '—'} м²</span></span>
+        </div>
+        <div class="modal-section-title">Дополнительные опции</div>
+        <div class="modal-options-list">
+            ${estate.utilities && estate.utilities.length
+                ? estate.utilities.map(u => `<span>✅</span>${u}`).join('<br>')
+                : '<span style="color:#888">нет</span>'
+            }
+        </div>
+        <div class="modal-section-title">Описание</div>
+        <div class="modal-description" id="modalDescription">
+            ${estate.description || ''}
+        </div>
+    `;
+
+    // Галерея в модалке
+    let modalCurrent = 0;
+    const modalGalleryMain = document.getElementById('modalGalleryMain');
+    const modalGalleryThumbs = document.getElementById('modalGalleryThumbs');
+    function renderModalGallery() {
+        modalGalleryMain.innerHTML = `<img src="${estate.images[modalCurrent]}" alt="Фото объекта">`;
+        modalGalleryThumbs.innerHTML = '';
+        estate.images.forEach((img, j) => {
+            const thumb = document.createElement('img');
+            thumb.src = img;
+            thumb.className = j === modalCurrent ? 'active' : '';
+            thumb.onclick = () => { modalCurrent = j; renderModalGallery(); }
+            modalGalleryThumbs.appendChild(thumb);
+        });
+    }
+    renderModalGallery();
+}
+
+function closeModal() {
+    modalBg.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+modalClose.onclick = closeModal;
+modalBg.onclick = e => { if (e.target === modalBg) closeModal(); };
+window.addEventListener('keydown', e => { if (modalBg.classList.contains('open') && e.key === 'Escape') closeModal(); });
+
+// ---- ФОРМА ----
+const formOverlay = document.getElementById('formOverlay');
+const formCloseBtn = document.getElementById('formCloseBtn');
+const orderForm = document.getElementById('orderForm');
+const orderSubmitBtn = document.getElementById('orderSubmitBtn');
+const orderSuccess = document.getElementById('orderSuccess');
+
+modalOrderBtn.onclick = () => {
+    formOverlay.classList.add('open');
+    orderForm.reset();
+    orderSubmitBtn.disabled = false;
+    orderSubmitBtn.textContent = 'Отправить';
+    orderSuccess.style.display = 'none';
+    orderForm.orderName.disabled = false;
+    orderForm.orderPhone.disabled = false;
+    orderForm.orderName.focus();
+};
+formCloseBtn.onclick = () => formOverlay.classList.remove('open');
+formOverlay.onclick = e => { if (e.target === formOverlay) formOverlay.classList.remove('open'); };
+
+orderForm.onsubmit = async function (e) {
+    e.preventDefault();
+    const name = orderForm.orderName.value.trim();
+    const phone = orderForm.orderPhone.value.trim();
+    if (!name || !phone) return;
+    orderSubmitBtn.disabled = true;
+    orderSubmitBtn.textContent = 'Отправка...';
+    let estate = modalEstateRef;
+    let msg = `📝 Заявка с сайта\nИмя: <b>${name}</b>\nТелефон: <b>${phone}</b>\n\nОбъект: <b>${(estate.village || '')}, ${estate.area_house || ''}м²</b>\nЦена: <b>${estate.price ? estate.price.replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " ₽" : ''}</b>\nАдрес: <b>${estate.address || ''}</b>`;
+    try {
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: TELEGRAM_CHAT_ID,
+                text: msg,
+                parse_mode: 'HTML'
+            })
+        });
+        orderSuccess.style.display = '';
+        orderSubmitBtn.textContent = 'Заявка отправлена!';
+        orderSubmitBtn.disabled = true;
+        orderForm.orderName.disabled = true;
+        orderForm.orderPhone.disabled = true;
+    } catch (e) {
+        orderSuccess.style.display = '';
+        orderSuccess.textContent = 'Ошибка отправки! Попробуйте позже.';
+        orderSubmitBtn.disabled = false;
+    }
+};
+    </script>
+</body>
+</html>
