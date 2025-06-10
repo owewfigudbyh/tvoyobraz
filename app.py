@@ -17,6 +17,8 @@ def load_flats():
     return cache['flats']
 
 def save_flats(flats):
+    # На Vercel это не будет работать для production, но локально можно.
+    # Для production лучше подключить внешнюю БД (например, Supabase, Firebase или Google Sheets).
     with open(FLATS_PATH, 'w', encoding='utf-8') as f:
         json.dump(flats, f, ensure_ascii=False, indent=2)
     cache['flats'] = flats
