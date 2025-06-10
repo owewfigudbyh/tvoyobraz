@@ -22,20 +22,9 @@ HEADERS = {
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
-def upload_to_supabase_storage(file, filename):
-    storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{filename}"
-    headers = {
-        "apikey": SUPABASE_API_KEY,
-        "Authorization": f"Bearer {SUPABASE_API_KEY}",
-        "Content-Type": file.content_type,
-        "x-upsert": "true"
-    }
-    response = requests.post(storage_url, headers=headers, data=file.read())
-    if response.status_code in (200, 201):
-        # Вернём публичную ссылку на файл (если bucket public)
-        return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}"
-    else:
-        raise Exception(f"Supabase Storage error: {response.text}")
+# ЭТОТ ЭНДПОИНТ БОЛЬШЕ НЕ НУЖЕН:
+# def upload_to_supabase_storage(file, filename):
+#     ... (удалить или закомментировать)
 
 @app.route('/api/list')
 def api_list():
@@ -82,27 +71,10 @@ def api_delete():
         return jsonify({"error": r.text}), 400
     return jsonify({'ok': True})
 
-@app.route('/api/upload', methods=['POST'])
-def api_upload():
-    if 'images' not in request.files:
-        return jsonify({"error": "No files found in request"}), 400
-
-    files = request.files.getlist('images')
-    uploaded = []
-    errors = []
-
-    for file in files:
-        if file and allowed_file(file.filename):
-            filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
-            try:
-                public_url = upload_to_supabase_storage(file, filename)
-                uploaded.append(public_url)
-            except Exception as e:
-                errors.append({"filename": file.filename, "error": str(e)})
-        else:
-            errors.append({"filename": file.filename, "error": "Not allowed file extension"})
-
-    return jsonify({"uploaded": uploaded, "errors": errors})
+# /api/upload больше не нужен — удалить или закомментировать
+# @app.route('/api/upload', methods=['POST'])
+# def api_upload():
+#     ...
 
 @app.route('/')
 def index():
