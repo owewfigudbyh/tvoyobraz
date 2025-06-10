@@ -22,9 +22,19 @@ HEADERS = {
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
-# ЭТОТ ЭНДПОИНТ БОЛЬШЕ НЕ НУЖЕН:
-# def upload_to_supabase_storage(file, filename):
-#     ... (удалить или закомментировать)
+def upload_to_supabase_storage(file, filename):
+    url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{filename}"
+    headers = {
+        "apikey": SUPABASE_API_KEY,
+        "Authorization": f"Bearer {SUPABASE_API_KEY}",
+        "Content-Type": file.content_type
+    }
+    resp = requests.post(url, headers=headers, data=file.read())
+    if resp.status_code not in (200, 201):
+        return None
+    # Получить публичный URL
+    public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}"
+    return public_url
 
 @app.route('/api/list')
 def api_list():
@@ -71,10 +81,20 @@ def api_delete():
         return jsonify({"error": r.text}), 400
     return jsonify({'ok': True})
 
-# /api/upload больше не нужен — удалить или закомментировать
-# @app.route('/api/upload', methods=['POST'])
-# def api_upload():
-#     ...
+@app.route('/api/upload', methods=['POST'])
+def api_upload():
+    files = request.files.getlist('images')
+    uploaded = []
+    for file in files:
+        if file and allowed_file(file.filename):
+            ext = file.filename.rsplit('.', 1)[1].lower()
+            filename = f"{uuid.uuid4().hex}.{ext}"
+            public_url = upload_to_supabase_storage(file, filename)
+            if public_url:
+                uploaded.append(public_url)
+    if not uploaded:
+        return jsonify({'error': 'Ошибка загрузки файлов'}), 400
+    return jsonify({'uploaded': uploaded})
 
 @app.route('/')
 def index():
