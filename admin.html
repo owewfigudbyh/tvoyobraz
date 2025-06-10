@@ -52,12 +52,13 @@
         .admin-card .actions button.edit-btn { background: #2b7cff; }
         .admin-card .actions button:hover { opacity: 0.88; }
     </style>
+    <!-- Подключаем Supabase JS SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body>
     <div class="container">
         <h1>Добавить участок</h1>
         <form id="adminForm">
-            <!-- Скрытый input для id (для редактирования) -->
             <input type="hidden" id="itemId" name="id">
             <label for="photo">Фото (любое количество)</label>
             <input type="file" id="photo" name="photo" accept="image/*" multiple>
@@ -98,10 +99,15 @@
             <button type="submit" id="submitBtn">Сохранить</button>
         </form>
         <div id="result"></div>
-
         <div class="cards-list" id="cardsList"></div>
     </div>
     <script>
+        // Supabase config
+        const SUPABASE_URL = "https://zgyiebfsfyccssvdjogi.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpneWllYmZzZnljY3NzdmRqb2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTMwMjYsImV4cCI6MjA2NTEyOTAyNn0.z5sVR6TAbjkzgwaEdrsy-7F804_aciiQlOSAhmh2obw";
+        const BUCKET = "images";
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
         // Preview images
         document.getElementById('photo').addEventListener('change', function(event) {
             const files = event.target.files;
@@ -117,8 +123,6 @@
                 reader.readAsDataURL(files[i]);
             }
         });
-
-        // --- CRUD ФУНКЦИИ ---
 
         // Получение всех карточек
         function fetchCards() {
@@ -178,7 +182,6 @@
 
         // Заполнить форму для редактирования
         function fillForm(card) {
-            // Заполняем значения
             document.getElementById('itemId').value = card.id || '';
             document.getElementById('address').value = card.address || '';
             document.getElementById('description').value = card.description || '';
@@ -190,94 +193,90 @@
             document.getElementById('condition').value = card.condition || '';
             document.getElementById('village').value = card.village || '';
             document.getElementById('price').value = card.price || '';
-
-            // Чекбоксы
             document.querySelectorAll('input[name="utilities"]').forEach(cb => {
                 cb.checked = (card.utilities || []).includes(cb.value);
             });
-
-            // Фото: нельзя редактировать, только при загрузке новых через input
             document.getElementById('preview').innerHTML = (card.images || []).map(url => `<img src="${url}" alt="">`).join('');
         }
 
+        // --- JS функция для загрузки файлов напрямую в Supabase Storage ---
+        async function uploadImagesToSupabase(files) {
+            const uploadedUrls = [];
+            for (const file of files) {
+                const ext = file.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 7)}.${ext}`;
+                const { data, error } = await supabase.storage.from(BUCKET).upload(fileName, file);
+                if (error) {
+                    alert("Ошибка загрузки " + file.name + ": " + error.message);
+                    continue;
+                }
+                const { data: publicUrlData } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
+                uploadedUrls.push(publicUrlData.publicUrl);
+            }
+            return uploadedUrls;
+        }
+
         // --- Обработка формы ---
-        document.getElementById('adminForm').addEventListener('submit', function(event) {
+        document.getElementById('adminForm').addEventListener('submit', async function(event) {
             event.preventDefault();
 
             const form = event.target;
             const files = form.photo.files;
             const id = form.id.value;
-
-            // Режим: если id есть, то это UPDATE, иначе CREATE
             const isEdit = !!id;
 
-            // --- Для создания и для изменения логика разная ---
-            function sendMainData(imagesArr) {
-                const utilities = [];
-                form.querySelectorAll('input[name="utilities"]:checked').forEach(ch => utilities.push(ch.value));
-                const data = {
-                    id: id || undefined,
-                    images: imagesArr,
-                    address: form.address.value,
-                    description: form.description.value,
-                    area_house: form.area_house.value,
-                    area_land: form.area_land.value,
-                    land_category: form.land_category.value,
-                    status: form.status.value,
-                    material: form.material.value,
-                    condition: form.condition.value,
-                    utilities,
-                    village: form.village.value,
-                    price: form.price.value
-                };
-                fetch(isEdit ? '/api/update' : '/api/add', {
-                    method: 'POST',
-                    headers: {'Content-Type':'application/json'},
-                    body: JSON.stringify(data)
-                })
-                .then(r=>r.json())
-                .then(res=>{
-                    document.getElementById('result').textContent = 'Данные сохранены!';
-                    form.reset();
-                    document.getElementById('itemId').value = '';
-                    document.getElementById('preview').innerHTML = '';
-                    setTimeout(()=>{document.getElementById('result').textContent=''}, 1800);
-                    fetchCards();
-                })
-                .catch(()=>{document.getElementById('result').textContent = 'Ошибка сохранения';});
-            }
+            // Собираем utilites
+            const utilities = [];
+            form.querySelectorAll('input[name="utilities"]:checked').forEach(ch => utilities.push(ch.value));
 
-            // Если выбраны новые файлы — загружаем их
+            // Если выбраны новые файлы — загружаем их сразу в Supabase!
+            let imagesArr = [];
             if (files && files.length) {
-                const formData = new FormData();
-                for (let i = 0; i < files.length; i++) {
-                    formData.append('images', files[i]); // ИМЯ ПОЛЯ ДОЛЖНО БЫТЬ 'images'!
-                }
-                fetch('/api/upload', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(r => r.json())
-                .then(res => {
-                    if (!res.uploaded) { // Ожидаем поле 'uploaded' из backend!
-                        document.getElementById('result').textContent = 'Ошибка загрузки фото!';
-                        return;
-                    }
-                    sendMainData(res.uploaded);
-                })
-                .catch(() => {
+                imagesArr = await uploadImagesToSupabase(files);
+                if (!imagesArr.length) {
                     document.getElementById('result').textContent = 'Ошибка загрузки фото!';
-                });
-
+                    return;
+                }
             } else {
                 // Если редактируем — берём предыдущие фото (из превью)
-                const imgs = Array.from(document.getElementById('preview').querySelectorAll('img')).map(img => img.src);
-                if (!imgs.length && !isEdit) {
+                imagesArr = Array.from(document.getElementById('preview').querySelectorAll('img')).map(img => img.src);
+                if (!imagesArr.length && !isEdit) {
                     alert('Пожалуйста, загрузите хотя бы одну фотографию.');
                     return;
                 }
-                sendMainData(imgs);
             }
+
+            const data = {
+                id: id || undefined,
+                images: imagesArr,
+                address: form.address.value,
+                description: form.description.value,
+                area_house: form.area_house.value,
+                area_land: form.area_land.value,
+                land_category: form.land_category.value,
+                status: form.status.value,
+                material: form.material.value,
+                condition: form.condition.value,
+                utilities,
+                village: form.village.value,
+                price: form.price.value
+            };
+
+            fetch(isEdit ? '/api/update' : '/api/add', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r=>r.json())
+            .then(res=>{
+                document.getElementById('result').textContent = 'Данные сохранены!';
+                form.reset();
+                document.getElementById('itemId').value = '';
+                document.getElementById('preview').innerHTML = '';
+                setTimeout(()=>{document.getElementById('result').textContent=''}, 1800);
+                fetchCards();
+            })
+            .catch(()=>{document.getElementById('result').textContent = 'Ошибка сохранения';});
         });
 
         // Старт — подгрузить карточки
