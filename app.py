@@ -3,14 +3,13 @@ import json
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
-from datetime import datetime
+import uuid
 
 app = Flask(__name__, static_folder='.')
 
 SUPABASE_URL = "https://zgyiebfsfyccssvdjogi.supabase.co"
 SUPABASE_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpneWllYmZzZnljY3NzdmRqb2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTMwMjYsImV4cCI6MjA2NTEyOTAyNn0.z5sVR6TAbjkzgwaEdrsy-7F804_aciiQlOSAhmh2obw"
-
-SUPABASE_BUCKET = "images"  # Имя bucket в Supabase Storage, создай его в панели Supabase!
+SUPABASE_BUCKET = "images"  # Имя bucket в Supabase Storage
 SUPABASE_TABLE = "flats"
 SUPABASE_REST = f"{SUPABASE_URL}/rest/v1/{SUPABASE_TABLE}"
 
@@ -85,23 +84,26 @@ def api_delete():
 
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
-    files = request.files.getlist('file')
-    urls = []
+    if 'images' not in request.files:
+        return jsonify({"error": "No files found in request"}), 400
+
+    files = request.files.getlist('images')
+    uploaded = []
+    errors = []
+
     for file in files:
         if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            name, ext = os.path.splitext(filename)
-            unique_filename = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
+            filename = f"{uuid.uuid4()}_{secure_filename(file.filename)}"
             try:
-                url = upload_to_supabase_storage(file, unique_filename)
-                urls.append(url)
+                public_url = upload_to_supabase_storage(file, filename)
+                uploaded.append(public_url)
             except Exception as e:
-                import traceback
-                print(traceback.format_exc())  # <-- добавь это!
-                return jsonify({'error': str(e)}), 500
-    if not urls:
-        return jsonify({'error': 'Нет валидных файлов'}), 400
-    return jsonify({'urls': urls})
+                errors.append({"filename": file.filename, "error": str(e)})
+        else:
+            errors.append({"filename": file.filename, "error": "Not allowed file extension"})
+
+    return jsonify({"uploaded": uploaded, "errors": errors})
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -113,6 +115,10 @@ def admin():
 @app.route('/<path:path>')
 def static_files(path):
     return send_from_directory('.', path)
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 if __name__ == '__main__':
     app.run(port=5000, debug=True)
