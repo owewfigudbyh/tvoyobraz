@@ -10,10 +10,7 @@ app = Flask(__name__, static_folder='.')
 SUPABASE_URL = "https://zgyiebfsfyccssvdjogi.supabase.co"
 SUPABASE_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpneWllYmZzZnljY3NzdmRqb2dpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk1NTMwMjYsImV4cCI6MjA2NTEyOTAyNn0.z5sVR6TAbjkzgwaEdrsy-7F804_aciiQlOSAhmh2obw"
 
-UPLOAD_FOLDER = 'static/images'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
+SUPABASE_BUCKET = "images"  # Имя bucket в Supabase Storage, создай его в панели Supabase!
 SUPABASE_TABLE = "flats"
 SUPABASE_REST = f"{SUPABASE_URL}/rest/v1/{SUPABASE_TABLE}"
 
@@ -24,15 +21,30 @@ HEADERS = {
 }
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+
+def upload_to_supabase_storage(file, filename):
+    storage_url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{filename}"
+    headers = {
+        "apikey": SUPABASE_API_KEY,
+        "Authorization": f"Bearer {SUPABASE_API_KEY}",
+        "Content-Type": file.content_type,
+        "x-upsert": "true"
+    }
+    response = requests.post(storage_url, headers=headers, data=file.read())
+    if response.status_code in (200, 201):
+        # Вернём публичную ссылку на файл (если bucket public)
+        return f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}"
+    else:
+        raise Exception(f"Supabase Storage error: {response.text}")
 
 @app.route('/api/list')
 def api_list():
     r = requests.get(SUPABASE_REST + "?order=id.desc", headers=HEADERS)
     flats = r.json()
     for flat in flats:
-        flat['images'] = flat.get('images', []) or []
-        flat['utilities'] = flat.get('utilities', []) or []
+        flat['images'] = flat.get('images') or []
+        flat['utilities'] = flat.get('utilities') or []
     return jsonify(flats)
 
 @app.route('/api/add', methods=['POST'])
@@ -80,13 +92,16 @@ def api_upload():
             filename = secure_filename(file.filename)
             name, ext = os.path.splitext(filename)
             unique_filename = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S%f')}{ext}"
-            filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-            file.save(filepath)
-            urls.append(f"/static/images/{unique_filename}")
+            try:
+                url = upload_to_supabase_storage(file, unique_filename)
+                urls.append(url)
+            except Exception as e:
+                import traceback
+                print(traceback.format_exc())  # <-- добавь это!
+                return jsonify({'error': str(e)}), 500
     if not urls:
         return jsonify({'error': 'Нет валидных файлов'}), 400
     return jsonify({'urls': urls})
-
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
