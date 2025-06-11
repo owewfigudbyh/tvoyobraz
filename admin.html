@@ -60,7 +60,11 @@
             cursor: pointer;
             display: block;
         }
-        #addMoreBtn:hover {
+        #addMoreBtn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+        #addMoreBtn:hover:enabled {
             background: #2b7cff;
             color: #fff;
         }
@@ -150,14 +154,12 @@
         const preview = document.getElementById('preview');
         let uploading = false;
 
-        // Рендер превью с красивым крестиком
         function renderPreview(imagesArr) {
             preview.innerHTML = '';
             imagesArr.forEach((url, idx) => {
                 const div = document.createElement('div');
                 const img = document.createElement('img');
                 img.src = url;
-                // Кнопка удалить
                 const btn = document.createElement('button');
                 btn.type = "button";
                 btn.className = "del-img";
@@ -173,9 +175,10 @@
             currentImages = imagesArr;
         }
 
-        // Быстрая загрузка файлов — чуть быстрее за счет параллельных fetch
         function uploadFiles(files) {
             uploading = true;
+            addMoreBtn.disabled = true;
+            addMoreBtn.textContent = 'Загрузка...';
             document.getElementById('result').textContent = 'Загрузка фото...';
             const formData = new FormData();
             for (let i = 0; i < files.length; i++) {
@@ -188,29 +191,30 @@
             .then(r => r.json())
             .then(res => {
                 uploading = false;
+                addMoreBtn.disabled = false;
+                addMoreBtn.textContent = '+ Добавить ещё фото';
                 document.getElementById('result').textContent = '';
                 if (!res.uploaded) {
                     document.getElementById('result').textContent = 'Ошибка загрузки фото!';
                     return;
                 }
-                // добавляем к текущим картинкам
                 currentImages = currentImages.concat(res.uploaded);
                 renderPreview(currentImages);
                 photoInput.value = '';
             })
             .catch(() => {
                 uploading = false;
+                addMoreBtn.disabled = false;
+                addMoreBtn.textContent = '+ Добавить ещё фото';
                 document.getElementById('result').textContent = 'Ошибка загрузки фото!';
             });
         }
 
-        // Показываем диалог выбора файлов по кнопке "Добавить еще фото"
         addMoreBtn.addEventListener('click', function() {
             if (uploading) return;
             photoInput.click();
         });
 
-        // При выборе файлов
         photoInput.addEventListener('change', function(event) {
             if (uploading) return;
             const files = event.target.files;
@@ -218,7 +222,6 @@
             uploadFiles(files);
         });
 
-        // Получение всех карточек
         function fetchCards() {
             fetch('/api/list')
                 .then(r => r.json())
@@ -228,7 +231,6 @@
                 });
         }
 
-        // Показать карточки
         function showCards(cards) {
             const list = document.getElementById('cardsList');
             list.innerHTML = '';
@@ -251,7 +253,6 @@
                         <button data-id="${card.id}">Удалить</button>
                     </div>
                 `;
-                // Кнопка удалить
                 el.querySelector('button:not(.edit-btn)').onclick = function() {
                     if (confirm('Удалить объект?')) {
                         fetch('/api/delete', {
@@ -265,7 +266,6 @@
                         });
                     }
                 };
-                // Кнопка изменить
                 el.querySelector('.edit-btn').onclick = function() {
                     fillForm(card);
                     window.scrollTo({top: 0, behavior: 'smooth'});
@@ -274,7 +274,6 @@
             });
         }
 
-        // Заполнить форму для редактирования
         function fillForm(card) {
             document.getElementById('itemId').value = card.id || '';
             document.getElementById('address').value = card.address || '';
@@ -294,7 +293,6 @@
             renderPreview(currentImages);
         }
 
-        // --- Обработка формы ---
         document.getElementById('adminForm').addEventListener('submit', function(event) {
             event.preventDefault();
             if (uploading) {
