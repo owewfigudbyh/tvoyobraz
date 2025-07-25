@@ -113,7 +113,11 @@ def static_files(path):
     return send_from_directory('.', path)
 
 @app.route('/favicon.ico')
-def favicon():
+def favicon_ico():
+    return '', 204
+
+@app.route('/favicon.png')
+def favicon_png():
     return '', 204
 
 if __name__ == '__main__':
