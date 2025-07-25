@@ -20,7 +20,8 @@ HEADERS = {
 }
 
 def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+    # Теперь HEIC поддерживается!
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif', 'heic'}
 
 def upload_to_supabase_storage(file, filename):
     url = f"{SUPABASE_URL}/storage/v1/object/{SUPABASE_BUCKET}/{filename}"
@@ -31,8 +32,8 @@ def upload_to_supabase_storage(file, filename):
     }
     resp = requests.post(url, headers=headers, data=file.read())
     if resp.status_code not in (200, 201):
+        print('SUPABASE UPLOAD ERROR:', resp.status_code, resp.text)
         return None
-    # Получить публичный URL
     public_url = f"{SUPABASE_URL}/storage/v1/object/public/{SUPABASE_BUCKET}/{filename}"
     return public_url
 
@@ -84,8 +85,10 @@ def api_delete():
 @app.route('/api/upload', methods=['POST'])
 def api_upload():
     files = request.files.getlist('images')
+    print('UPLOAD REQUEST FILES:', files)
     uploaded = []
     for file in files:
+        print('PROCESS FILE:', getattr(file, 'filename', None))
         if file and allowed_file(file.filename):
             ext = file.filename.rsplit('.', 1)[1].lower()
             filename = f"{uuid.uuid4().hex}.{ext}"
@@ -93,6 +96,7 @@ def api_upload():
             if public_url:
                 uploaded.append(public_url)
     if not uploaded:
+        print('UPLOAD ERROR: No files uploaded or wrong format')
         return jsonify({'error': 'Ошибка загрузки файлов'}), 400
     return jsonify({'uploaded': uploaded})
 
