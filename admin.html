@@ -175,40 +175,48 @@
             currentImages = imagesArr;
         }
 
-        function uploadFiles(files) {
-            uploading = true;
-            addMoreBtn.disabled = true;
-            addMoreBtn.textContent = 'Загрузка...';
-            document.getElementById('result').textContent = 'Загрузка фото...';
-            const formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append('images', files[i]);
-            }
-            fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            })
-            .then(r => r.json())
-            .then(res => {
-                uploading = false;
-                addMoreBtn.disabled = false;
-                addMoreBtn.textContent = '+ Добавить ещё фото';
-                document.getElementById('result').textContent = '';
-                if (!res.uploaded) {
-                    document.getElementById('result').textContent = 'Ошибка загрузки фото!';
-                    return;
-                }
-                currentImages = currentImages.concat(res.uploaded);
-                renderPreview(currentImages);
-                photoInput.value = '';
-            })
-            .catch(() => {
-                uploading = false;
-                addMoreBtn.disabled = false;
-                addMoreBtn.textContent = '+ Добавить ещё фото';
-                document.getElementById('result').textContent = 'Ошибка загрузки фото!';
-            });
+     function uploadFiles(files) {
+    uploading = true;
+    addMoreBtn.disabled = true;
+    addMoreBtn.textContent = 'Загрузка...';
+    document.getElementById('result').textContent = 'Загрузка фото...';
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+        formData.append('images', files[i]);
+    }
+    fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(res => {
+        uploading = false;
+        addMoreBtn.disabled = false;
+        addMoreBtn.textContent = '+ Добавить ещё фото';
+        document.getElementById('result').textContent = '';
+        if (!res.uploaded) {
+            document.getElementById('result').textContent = res.error ? 'Ошибка загрузки: ' + res.error : 'Ошибка загрузки фото!';
+            return;
         }
+        currentImages = currentImages.concat(res.uploaded);
+        renderPreview(currentImages);
+        photoInput.value = '';
+    })
+    .catch(async (err) => {
+        uploading = false;
+        addMoreBtn.disabled = false;
+        addMoreBtn.textContent = '+ Добавить ещё фото';
+        let errMsg = 'Ошибка загрузки фото!';
+        // если сервер вернул json с error
+        if (err && err.json) {
+            try {
+                const data = await err.json();
+                if (data && data.error) errMsg += ' ' + data.error;
+            } catch {}
+        }
+        document.getElementById('result').textContent = errMsg;
+    });
+}
 
         addMoreBtn.addEventListener('click', function() {
             if (uploading) return;
